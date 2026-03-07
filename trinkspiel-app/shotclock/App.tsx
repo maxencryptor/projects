@@ -48,7 +48,10 @@ export default function App() {
           <SetupScreen
             players={state.players}
             newPlayerName={state.newPlayerName}
+            setupMessage={state.setupMessage}
             canStartGame={state.canStartGame}
+            minPlayers={state.minPlayers}
+            maxPlayers={state.maxPlayers}
             onBackToMenu={actions.backToMenu}
             onSetNewPlayerName={actions.setNewPlayerName}
             onAddPlayer={actions.addPlayer}
@@ -57,17 +60,28 @@ export default function App() {
           />
         )}
 
-        {state.currentMode === 'category-sprint' && (
+        {state.currentMode === 'game' && (
           <GameScreen
+            phase={state.phase}
             currentPlayerName={state.currentPlayer?.name ?? '-'}
             currentCategory={state.currentCategory}
-            timeLeft={state.timeLeft}
-            roundExploded={state.roundExploded}
+            currentLetter={state.currentLetter}
+            turnDurationSeconds={state.turnDurationSeconds}
+            shotIndex={state.shotIndex}
+            chambers={state.chambers}
             players={state.players}
-            leaderText={state.leaderText}
+            currentPlayerIndex={state.currentPlayerIndex}
+            chambersPerRound={state.chambersPerRound}
+            rewardPlayerName={state.rewardPlayer?.name ?? ''}
+            roundMessage={state.roundMessage}
+            loserText={state.loserText}
+            failedPlayerNames={state.failedPlayerNames}
+            pengTrigger={state.pengTrigger}
             onResetGame={actions.resetGame}
-            onPlayerAnswered={actions.playerAnswered}
-            onContinueAfterExplosion={actions.continueAfterExplosion}
+            onMarkAnswerCorrect={actions.markAnswerCorrect}
+            onMarkAnswerWrong={actions.markAnswerWrong}
+            onAssignShotToPlayer={actions.assignShotToPlayer}
+            onContinueAfterRoundResult={actions.continueAfterRoundResult}
           />
         )}
       </SafeAreaView>
