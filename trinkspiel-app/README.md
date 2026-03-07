@@ -1,145 +1,94 @@
-# 🍻 Trinkspiel App - Projekt-Doku
+# ShotClock Trinkspiel App
 
-> Letzte Aktualisierung: 2026-03-06
-> Status: 🚧 MVP in Entwicklung
+Letzte Aktualisierung: 2026-03-07  
+Status: MVP lauffaehig (Kategorie-Sprint)
 
----
+## Was die App aktuell kann
 
-## 🎯 Vision
+- Startscreen mit Party-Style UI (mehrfarbig, trotzdem clean)
+- Spieler-Setup vor Spielstart
+- Spieler hinzufuegen und entfernen
+- Spielstart erst ab mindestens 2 Spielern
+- Kategorie-Sprint Runde mit 10s Timer
+- Zufalls-Kategorie und (wo passend) Zufalls-Buchstabe
+- Feste Zugreihenfolge zwischen Spielern
+- Wenn die Bombe beim aktiven Spieler explodiert (Timer = 0), bekommt dieser 1 Strafpunkt
+- Live-Scoreboard mit Strafpunkten pro Spieler
+- Anzeige, wer aktuell verliert (meiste Strafpunkte)
+- Spiel zuruecksetzen
 
-Intuitive Trinkspiel-App mit Fokus auf:
-- **Schöne UI** - Eye-catching Design mit sanften Animationen
-- **Einfachheit** - Keine komplexen Menüs, sofort loslegen
-- **Social** - Perfekt für Partys mit Freunden
+## Aktueller Spielablauf (Kategorie-Sprint)
 
----
+1. In der App auf `Spieler vorbereiten` gehen.
+2. Mindestens 2 Spieler anlegen.
+3. `Kategorie Sprint starten` druecken.
+4. Aktiver Spieler sieht Kategorie + Countdown.
+5. Bei Antwort: `Ich habe geantwortet`.
+6. Bei Timer 0: Bombe explodiert beim aktiven Spieler, Strafpunkt wird vergeben.
+7. Naechster Spieler ist dran.
 
-## 🛠️ Tech Stack
+Regel aktuell: Der Spieler mit den meisten Strafpunkten verliert.
 
-| Komponente | Technologie |
-|------------|-------------|
-| Framework | React Native + Expo |
-| Styling | NativeWind (Tailwind) |
-| Animationen | React Native Reanimated |
-| Icons | Phosphor Icons |
-| State | React Context (erstmal simpel) |
+## Tech Stack (realer Stand)
 
----
+- Expo SDK 54
+- React Native 0.81
+- React 19
+- TypeScript 5.9
+- `react-native-safe-area-context` fuer Safe Areas
 
-## ✅ MVP Checkliste
+## Projektstruktur
 
-### Phase 1: Grundgerüst
-- [x] Expo Projekt initialisieren
-- [ ] Grund-Navigation (Stack Navigator)
-- [ ] Farbschema + Design-System
-- [ ] Splash Screen
-
-### Phase 2: Spielmechanik
-- [ ] Timer-Komponente (animiert)
-- [ ] Kategorie-System
-- [ ] Spieler-Verwaltung
-- [ ] Punkte/Strafen-Logik
-
-### Phase 3: Polish
-- [ ] Karten-Animationen (Flip, Shake)
-- [ ] Sound-Effekte
-- [ ] Haptic Feedback
-- [ ] Dark/Light Mode
-
----
-
-## 🎮 Spielmodi
-
-### Modus 1: Kategorie-Sprint (MVP)
-**Ablauf:**
-1. Kategorie wird angezeigt (z.B. "Bands mit Buchstabe R")
-2. Timer startet (10 Sekunden)
-3. Spieler muss etwas nennen + Button drücken
-4. Nächster Spieler ist dran
-5. Wer zu langsam ist oder nichts weiß -> trinkt
-
-**Besonderheit:** Timer wird schneller je länger das Spiel läuft
-
-### Modus 2: Wahrheit oder Pflicht (V2)
-- Rotierende Aufgaben
-- Schwierigkeitsgrade
-
-### Modus 3: Wort-Kette (V2)
-- Letzter Buchstabe = Erster Buchstabe
-- Zeitdruck
-
----
-
-## 🎨 Design-System
-
-### Farben
-```
-Primary:    #FF6B6B (Warmes Rot/Orange - Party-Vibe)
-Secondary:  #4ECDC4 (Türkis - Kontrast)
-Background: #1A1A2E (Dunkles Navy - Premium-Feel)
-Surface:    #16213E (Etwas heller für Karten)
-Text:       #FFFFFF (Weiß)
-Accent:     #FFE66D (Gelb für Highlights)
+```text
+trinkspiel-app/
+  README.md
+  shotclock/
+    App.tsx
+    src/
+      components/
+        MenuScreen.tsx
+        SetupScreen.tsx
+        GameScreen.tsx
+      constants/
+        Colors.ts
+      game/
+        constants.ts
+        types.ts
+        utils.ts
+        useShotclockGame.ts
+      styles/
+        appStyles.ts
 ```
 
-### Typografie
-- **Headlines:** Bold, groß, verspielt
-- **Body:** Clean, gut lesbar
-- **Timer:** Monospace, groß
+## Architektur (Clean Code)
 
-### Animationen
-- **Karten-Flip:** 0.3s ease-in-out
-- **Shake:** Bei falscher Antwort
-- **Pulse:** Timer < 3 Sekunden
-- **Slide:** Screen-Transitions
+- `App.tsx`: nur Composition/Screen-Switching
+- `src/game/useShotclockGame.ts`: komplette Spielzustands- und Ablauflogik
+- `src/components/*`: reine UI-Screens (praesentational)
+- `src/styles/appStyles.ts`: zentrale Styles
+- `src/game/constants.ts|utils.ts|types.ts`: domain-nahe Bausteine
 
----
+So sind Logik, UI und Styling klar getrennt.
 
-## 📱 Screens
+## Projekt starten
 
-1. **Home** - Spielmodus wählen
-2. **Spieler-Setup** - Namen eingeben
-3. **Spiel** - Hauptspielfläche
-4. **Ergebnis** - Runde beendet
+```bash
+cd shotclock
+npm install
+npx expo start -c --tunnel 
+```
 
----
+## Hinweise
 
-## 💰 Monetarisierung (V2)
+- Wenn iOS Probleme mit altem Build/Cache zeigt:
 
-**Gratis:**
-- 3 Kategorien
-- Basis-Spielmodi
-- Werbung alle 5 Runden
+```bash
+npx expo run:ios
+npx expo start -c
+```
 
-**Premium (4,99€):**
-- 50+ Kategorien
-- Alle Spielmodi
-- Werbefrei
-- Custom Kategorien
+## Nächste sinnvolle Schritte
 
----
-
-## 📝 Änderungslog
-
-### 2026-03-06
-- Projekt gestartet
-- Tech Stack entschieden: Expo + React Native
-- MVP Scope definiert: Kategorie-Sprint Modus
-- Design-Farbschema festgelegt
-
----
-
-## 🤔 Offene Fragen
-
-- [ ] App-Name finalisieren
-- [ ] Logo/Idee?
-- [ ] Soll es Multiplayer-Online geben oder nur lokal?
-- [ ] Welche Kategorien sollen im MVP drin sein?
-
----
-
-## 📚 Ressourcen
-
-- Expo Docs: https://docs.expo.dev
-- React Native Docs: https://reactnative.dev
-- Icons: https://phosphoricons.com
+- Spielende-Regel konfigurierbar machen (z. B. bei 5 Strafpunkten)
+- Persistenz fuer Spieler/Letzten Spielstand
+- Weitere Spielmodi aktiv entwickeln (Wahrheit/Pflicht, Wort-Kette)

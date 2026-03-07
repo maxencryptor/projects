@@ -1,20 +1,23 @@
-// Neon-Glow Color Palette fuer ShotClock
 export const Colors = {
-  // Primary Colors
-  primary: '#FF6B6B',
-  secondary: '#4ECDC4',
-  accent: '#FFE66D',
-  
-  // Background
-  background: '#0D0D0D',
-  surface: '#1A1A1A',
-  
-  // Text
-  text: '#FFFFFF',
-  textSecondary: '#9CA3AF',
-  
-  // Status
-  success: '#4ADE80',
-  danger: '#EF4444',
-  warning: '#F59E0B',
+  primary: '#FF5F8A',
+  secondary: '#4CC9F0',
+  accent: '#FFCF56',
+
+  partyPink: '#FF5F8A',
+  partyPinkSoft: '#4B2234',
+  partyBlue: '#3EB8FF',
+
+  background: '#11131A',
+  surface: '#1C2030',
+  card: '#262C41',
+  border: '#3B4461',
+
+  text: '#F5F7FF',
+  textSecondary: '#B4BDD8',
+  textMuted: '#8893B5',
+
+  success: '#2ED587',
+  danger: '#FF5D6C',
+  dangerSoft: '#442733',
+  warning: '#FF9A3D',
 };
