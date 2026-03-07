@@ -18,6 +18,12 @@ const getRandomTurnDuration = () =>
   Math.floor(Math.random() * (ROUND_TIME_MAX_SECONDS - ROUND_TIME_MIN_SECONDS + 1)) +
   ROUND_TIME_MIN_SECONDS;
 
+type RoundPlayerStats = {
+  playerId: string;
+  totalShots: number;
+  fullShots: number;
+};
+
 export function useShotclockGame() {
   const [currentMode, setCurrentMode] = useState<GameMode>('menu');
   const [phase, setPhase] = useState<Phase>('playing');
@@ -68,7 +74,7 @@ export function useShotclockGame() {
       return;
     }
 
-    resolveShot(false, 'Timeout: Kammer leer.');
+    resolveShot(false, 'timeout', 'Timeout: Kammer leer.');
   }, [phase, isTimerRunning, timeLeft]);
 
   const currentPlayer = players[currentPlayerIndex];
@@ -88,11 +94,52 @@ export function useShotclockGame() {
 
   const loserText = useMemo(() => {
     if (failedPlayerNames.length === 0) {
-      return 'Keine Fehlschuesse in dieser Runde.';
+      return 'Niemand muss trinken.';
     }
 
-    return `Trinken: ${failedPlayerNames.join(', ')}`;
+    return `Trinken (wenigste volle Patronen): ${failedPlayerNames.join(', ')}`;
   }, [failedPlayerNames]);
+
+  const evaluateRound = (roundChambers: boolean[], roundOwners: (string | null)[]) => {
+    const statsByPlayerId = new Map<string, RoundPlayerStats>();
+
+    roundOwners.forEach((ownerId, index) => {
+      if (!ownerId) {
+        return;
+      }
+
+      const existing = statsByPlayerId.get(ownerId) ?? {
+        playerId: ownerId,
+        totalShots: 0,
+        fullShots: 0,
+      };
+      existing.totalShots += 1;
+      if (roundChambers[index]) {
+        existing.fullShots += 1;
+      }
+
+      statsByPlayerId.set(ownerId, existing);
+    });
+
+    const stats = Array.from(statsByPlayerId.values()).filter((item) => item.totalShots > 0);
+    if (stats.length === 0) {
+      return {
+        drinkerIds: [] as string[],
+        perfectPlayerIds: [] as string[],
+      };
+    }
+
+    const minFullShots = Math.min(...stats.map((item) => item.fullShots));
+    const drinkerIds = stats
+      .filter((item) => item.fullShots === minFullShots)
+      .map((item) => item.playerId);
+
+    const perfectPlayerIds = stats
+      .filter((item) => item.fullShots === item.totalShots)
+      .map((item) => item.playerId);
+
+    return { drinkerIds, perfectPlayerIds };
+  };
 
   const startRound = (starterIndex: number) => {
     const duration = getRandomTurnDuration();
@@ -113,7 +160,11 @@ export function useShotclockGame() {
     setCurrentMode('game');
   };
 
-  const resolveShot = (isCorrect: boolean, customMessage?: string) => {
+  const resolveShot = (
+    isCorrect: boolean,
+    reason: 'hit' | 'wrong' | 'timeout',
+    customMessage?: string
+  ) => {
     if (phase !== 'playing' || !currentPlayer) {
       return;
     }
@@ -130,7 +181,7 @@ export function useShotclockGame() {
     setChambers(nextChambers);
     setShotOwnerIds(nextShotOwners);
 
-    if (!isCorrect) {
+    if (reason === 'timeout') {
       setPengTrigger((prev) => prev + 1);
     }
 
@@ -149,25 +200,28 @@ export function useShotclockGame() {
     );
 
     if (shotIndex === CHAMBERS_PER_ROUND - 1) {
-      const allFull = nextChambers.every(Boolean);
+      const { drinkerIds, perfectPlayerIds } = evaluateRound(nextChambers, nextShotOwners);
 
-      if (allFull) {
-        setRewardPlayerId(currentPlayer.id);
-        setRoundMessage(`${currentPlayer.name} hat 6/6 getroffen. Volltreffer!`);
+      setFailedPlayerIds(drinkerIds);
+
+      if (perfectPlayerIds.length > 0) {
+        const randomPerfectId =
+          perfectPlayerIds[Math.floor(Math.random() * perfectPlayerIds.length)];
+        const perfectName =
+          players.find((player) => player.id === randomPerfectId)?.name ?? 'Spieler';
+
+        setRewardPlayerId(randomPerfectId);
+        setRoundMessage(`${perfectName} hat alle eigenen Patronen gehalten.`);
         setPhase('reward');
         return;
       }
 
-      const failedIds = Array.from(
-        new Set(
-          nextChambers
-            .map((isFull, index) => (!isFull ? nextShotOwners[index] : null))
-            .filter((id): id is string => Boolean(id))
-        )
+      setRoundMessage(
+        customMessage ??
+          (drinkerIds.length > 0
+            ? 'Spieler mit den wenigsten vollen Patronen trinken.'
+            : 'Niemand muss trinken.')
       );
-
-      setFailedPlayerIds(failedIds);
-      setRoundMessage(customMessage ?? 'Mindestens eine Kammer ist leer.');
       setPhase('result');
       return;
     }
@@ -183,9 +237,9 @@ export function useShotclockGame() {
     setIsTimerRunning(true);
   };
 
-  const markAnswerCorrect = () => resolveShot(true);
+  const markAnswerCorrect = () => resolveShot(true, 'hit');
 
-  const markAnswerWrong = () => resolveShot(false, 'Falsch: Kammer leer.');
+  const markAnswerWrong = () => resolveShot(false, 'wrong', 'Falsch: Kammer leer.');
 
   const assignShotToPlayer = (targetPlayerId: string) => {
     if (phase !== 'reward' || !rewardPlayerId) {
@@ -203,7 +257,7 @@ export function useShotclockGame() {
     );
 
     setRoundMessage(
-      `${rewardPlayer?.name ?? 'Spieler'} verteilt den Shot an ${targetName ?? 'jemanden'}.`
+      `${rewardPlayer?.name ?? 'Spieler'} bestimmt ${targetName ?? 'jemanden'} fuer einen Schluck.`
     );
     setPhase('result');
   };
