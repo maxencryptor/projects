@@ -1,14 +1,16 @@
 import React from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { MIN_PLAYERS } from '../game/constants';
-import { Player } from '../game/types';
 import { Colors } from '../constants/Colors';
+import { Player } from '../game/types';
 import { styles } from '../styles/appStyles';
 
 type SetupScreenProps = {
   players: Player[];
   newPlayerName: string;
+  setupMessage: string;
   canStartGame: boolean;
+  minPlayers: number;
+  maxPlayers: number;
   onBackToMenu: () => void;
   onSetNewPlayerName: (name: string) => void;
   onAddPlayer: () => void;
@@ -19,7 +21,10 @@ type SetupScreenProps = {
 export function SetupScreen({
   players,
   newPlayerName,
+  setupMessage,
   canStartGame,
+  minPlayers,
+  maxPlayers,
   onBackToMenu,
   onSetNewPlayerName,
   onAddPlayer,
@@ -29,18 +34,21 @@ export function SetupScreen({
   return (
     <View style={styles.content}>
       <TouchableOpacity style={styles.backButton} onPress={onBackToMenu}>
-        <Text style={styles.backButtonText}>Zuruck zum Menu</Text>
+        <Text style={styles.backButtonText}>Zurueck zum Menu</Text>
       </TouchableOpacity>
 
-      <Text style={styles.sectionTitle}>Spieler hinzufugen</Text>
+      <Text style={styles.sectionTitle}>Spieler hinzufuegen</Text>
       <Text style={styles.sectionSubtext}>
-        Mindestens {MIN_PLAYERS} Spieler. Wer die Bombe beim eigenen Zug bekommt, erhalt einen Strafpunkt.
+        {minPlayers}-{maxPlayers} Spieler im Kreis. 6 Schuss pro Runde.
+      </Text>
+      <Text style={styles.playerCountText}>
+        Spieler: {players.length}/{maxPlayers}
       </Text>
 
       <View style={styles.inputRow}>
         <TextInput
           style={styles.playerInput}
-          placeholder="Name"
+          placeholder="Name eingeben"
           placeholderTextColor={Colors.textMuted}
           value={newPlayerName}
           onChangeText={onSetNewPlayerName}
@@ -50,6 +58,8 @@ export function SetupScreen({
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
+
+      {setupMessage ? <Text style={styles.validationText}>{setupMessage}</Text> : null}
 
       <View style={styles.playersList}>
         {players.length === 0 ? (
@@ -76,7 +86,7 @@ export function SetupScreen({
         activeOpacity={0.85}
         disabled={!canStartGame}
       >
-        <Text style={styles.primaryButtonText}>Kategorie Sprint starten</Text>
+        <Text style={styles.primaryButtonText}>Spiel starten</Text>
       </TouchableOpacity>
     </View>
   );
