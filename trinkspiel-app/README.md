@@ -1,43 +1,83 @@
 # ShotClock Trinkspiel App
 
 Letzte Aktualisierung: 2026-03-07  
-Status: MVP lauffaehig (Kategorie-Sprint)
+Status: MVP lauffaehig inkl. Kettenreaktions-Modus
 
-## Was die App aktuell kann
+## Ist-Stand (bereits umgesetzt)
 
-- Startscreen mit Party-Style UI (mehrfarbig, trotzdem clean)
-- Spieler-Setup vor Spielstart
-- Spieler hinzufuegen und entfernen
-- Spielstart erst ab mindestens 2 Spielern
-- Kategorie-Sprint Runde mit 10s Timer
-- Zufalls-Kategorie und (wo passend) Zufalls-Buchstabe
-- Feste Zugreihenfolge zwischen Spielern
-- Wenn die Bombe beim aktiven Spieler explodiert (Timer = 0), bekommt dieser 1 Strafpunkt
-- Live-Scoreboard mit Strafpunkten pro Spieler
-- Anzeige, wer aktuell verliert (meiste Strafpunkte)
-- Spiel zuruecksetzen
+- Startscreen mit klarer, party-tauglicher UI
+- Spieler-Setup (Spieler hinzufuegen/entfernen)
+- Spielstart ab mindestens 2 Spielern
+- Kategorie-Sprint mit 10s Timer
+- Kettenreaktions-Modus (frei und mit Kategorie)
+- Feste Zugreihenfolge
+- Bombe bei `Timer = 0` mit Strafpunkt fuer aktiven Spieler
+- Live-Scoreboard mit aktueller Verliereranzeige
+- Wort-Validierung auf korrekten Startbuchstaben
+- Ungueltige Eingabe zeigt `Nochmal!` + Warnung im aktuellen Zug
 
-## Aktueller Spielablauf (Kategorie-Sprint)
+## Spielkonzept
 
-1. In der App auf `Spieler vorbereiten` gehen.
-2. Mindestens 2 Spieler anlegen.
-3. `Kategorie Sprint starten` druecken.
-4. Aktiver Spieler sieht Kategorie + Countdown.
-5. Bei Antwort: `Ich habe geantwortet`.
-6. Bei Timer 0: Bombe explodiert beim aktiven Spieler, Strafpunkt wird vergeben.
-7. Naechster Spieler ist dran.
+ShotClock ist ein minimalistisches Trinkspiel mit Kettenreaktions-Mechanik.  
+Jeder Spieler muss ein Wort nennen, das mit dem letzten Buchstaben des vorherigen Wortes beginnt.
 
-Regel aktuell: Der Spieler mit den meisten Strafpunkten verliert.
+Beispiel:
+- Spieler 1: `Apfel` -> letzter Buchstabe `L`
+- Spieler 2: `Lampe` -> letzter Buchstabe `E`
+- Spieler 3: `Elch` -> letzter Buchstabe `H`
+- Spieler 4: `Haus` -> ...
 
-## Tech Stack (realer Stand)
+## Kern-Mechanik
 
-- Expo SDK 54
-- React Native 0.81
-- React 19
-- TypeScript 5.9
-- `react-native-safe-area-context` fuer Safe Areas
+### Timer-System
+- 10 Sekunden pro Spieler (konfigurierbar)
+- Visueller Countdown als kreisrunder Fortschrittsbalken
+- Letzte 3 Sekunden: Pulse-Animation + Rotwechsel
+- Bei 0: Bombe explodiert, aktiver Spieler erhaelt 1 Strafpunkt
 
-## Projektstruktur
+### Kategorien (optional)
+- Moduswahl vor Start:
+  - Freies Ketten-Spiel
+  - Kategorie-Modus
+- Im Kategorie-Modus wird eine Kategorie vor Spielstart festgelegt
+- Beispielkategorien: Tiere, Staedte, Berufe, Lebensmittel
+
+### Validierung
+- Pflichtregel: Wort muss mit korrektem Buchstaben beginnen
+- Optional: Woerterbuch-API fuer Rechtschreibpruefung
+- Ungueltiges Wort: `Nochmal!` (kein Zeitverlust, aber 1 Warnung)
+
+## Design-Vision (Minimalistisch & Elegant)
+
+### Farbschema
+- Primaer: `#1A1A2E`
+- Sekundaer: `#16213E`
+- Akzent: `#E94560` (Bombe/Timer)
+- Highlight: `#0F3460` (aktiver Spieler)
+- Text: `#EAEAEA`
+- Subtil: `#A0A0A0`
+
+### Typografie
+- Hauptschrift: Inter oder System-Font
+- Woerter: Bold
+- Timer: Monospace fuer technische Lesbarkeit
+- Generell: grosszuegige, dunkeltaugliche Groessen
+
+### Layout-Prinzipien
+- Maximal 3 Hauptelemente gleichzeitig sichtbar
+- Touch-Targets mindestens `48x48dp`
+- Viel Whitespace
+- Subtiler Glassmorphism fuer Overlays
+
+## Bombe-Explosion (Ziel-Animation)
+
+### Ablauf
+1. Vor-Explosion (`Timer = 0`): 3 kurze Rot-Weiss-Flashes + Haptik
+2. Explosion: Partikel (15-20), Farbverlauf Orange -> Gelb -> Weiss, Dauer ca. `800ms`
+3. Zusatz-Effekte: leichter Screen-Shake (`~500ms`), optional kurzer Boom-Sound
+4. Nach-Explosion: Rauch fade-out, `BOOM!`-Text, `+1`-Punkteanimation beim aktiven Spieler
+
+## Architektur
 
 ```text
 trinkspiel-app/
@@ -60,35 +100,18 @@ trinkspiel-app/
         appStyles.ts
 ```
 
-## Architektur (Clean Code)
-
-- `App.tsx`: nur Composition/Screen-Switching
-- `src/game/useShotclockGame.ts`: komplette Spielzustands- und Ablauflogik
-- `src/components/*`: reine UI-Screens (praesentational)
-- `src/styles/appStyles.ts`: zentrale Styles
-- `src/game/constants.ts|utils.ts|types.ts`: domain-nahe Bausteine
-
-So sind Logik, UI und Styling klar getrennt.
-
-## Projekt starten
+## Start
 
 ```bash
 cd shotclock
 npm install
-npx expo start -c --tunnel 
-```
-
-## Hinweise
-
-- Wenn iOS Probleme mit altem Build/Cache zeigt:
-
-```bash
-npx expo run:ios
 npx expo start -c
 ```
 
-## Nächste sinnvolle Schritte
+## Naechste Umsetzungsschritte
 
-- Spielende-Regel konfigurierbar machen (z. B. bei 5 Strafpunkten)
-- Persistenz fuer Spieler/Letzten Spielstand
-- Weitere Spielmodi aktiv entwickeln (Wahrheit/Pflicht, Wort-Kette)
+1. Visuellen Kreis-Fortschritt (echter Progress-Ring) statt statischer Timer-Anzeige bauen
+2. Pulse-Animation fuer die letzten 3 Sekunden ergaenzen
+3. Optionales Woerterbuch-API-Checking fuer Rechtschreibung integrieren
+4. Kategorie-Regel server- oder listebasiert pruefbar machen (aktuell social self-check)
+5. Explosionseffekt (Flash + Partikel + Shake + Haptik) implementieren
