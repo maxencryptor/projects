@@ -1,23 +1,56 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MIN_PLAYERS, ROUND_TIME_SECONDS } from './constants';
-import { buildRoundCategory } from './utils';
-import { GameMode, Player } from './types';
+import {
+  CHAMBERS_PER_ROUND,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  ROUND_TIME_MAX_SECONDS,
+  ROUND_TIME_MIN_SECONDS,
+} from './constants';
+import { getRandomCategory, getRandomLetter } from './utils';
+import { GameMode, Phase, Player } from './types';
+
+const pickRandomIndex = (totalPlayers: number) => Math.floor(Math.random() * totalPlayers);
+
+const nextPlayerIndex = (currentIndex: number, totalPlayers: number) =>
+  (currentIndex + 1) % totalPlayers;
+
+const getRandomTurnDuration = () =>
+  Math.floor(Math.random() * (ROUND_TIME_MAX_SECONDS - ROUND_TIME_MIN_SECONDS + 1)) +
+  ROUND_TIME_MIN_SECONDS;
 
 export function useShotclockGame() {
   const [currentMode, setCurrentMode] = useState<GameMode>('menu');
-  const [currentCategory, setCurrentCategory] = useState(buildRoundCategory);
-  const [timeLeft, setTimeLeft] = useState(ROUND_TIME_SECONDS);
+  const [phase, setPhase] = useState<Phase>('playing');
+
+  const [currentCategory, setCurrentCategory] = useState(getRandomCategory);
+  const [currentLetter, setCurrentLetter] = useState(getRandomLetter);
+
+  const [turnDurationSeconds, setTurnDurationSeconds] = useState(getRandomTurnDuration);
+  const [timeLeft, setTimeLeft] = useState(turnDurationSeconds);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [roundExploded, setRoundExploded] = useState(false);
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [newPlayerName, setNewPlayerName] = useState('');
+  const [setupMessage, setSetupMessage] = useState('');
+
+  const [shotIndex, setShotIndex] = useState(0);
+  const [chambers, setChambers] = useState<boolean[]>(
+    Array(CHAMBERS_PER_ROUND).fill(true)
+  );
+  const [shotOwnerIds, setShotOwnerIds] = useState<(string | null)[]>(
+    Array(CHAMBERS_PER_ROUND).fill(null)
+  );
+
+  const [rewardPlayerId, setRewardPlayerId] = useState<string | null>(null);
+  const [roundMessage, setRoundMessage] = useState('');
+  const [failedPlayerIds, setFailedPlayerIds] = useState<string[]>([]);
+  const [pengTrigger, setPengTrigger] = useState(0);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
 
-    if (isTimerRunning && timeLeft > 0) {
+    if (isTimerRunning && phase === 'playing' && timeLeft > 0) {
       interval = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
       }, 1000);
@@ -28,75 +61,168 @@ export function useShotclockGame() {
         clearInterval(interval);
       }
     };
-  }, [isTimerRunning, timeLeft]);
+  }, [isTimerRunning, phase, timeLeft]);
 
   useEffect(() => {
-    if (timeLeft !== 0 || !isTimerRunning) {
+    if (phase !== 'playing' || !isTimerRunning || timeLeft > 0) {
+      return;
+    }
+
+    resolveShot(false, 'Timeout: Kammer leer.');
+  }, [phase, isTimerRunning, timeLeft]);
+
+  const currentPlayer = players[currentPlayerIndex];
+
+  const rewardPlayer = useMemo(
+    () => players.find((player) => player.id === rewardPlayerId) ?? null,
+    [players, rewardPlayerId]
+  );
+
+  const failedPlayerNames = useMemo(
+    () =>
+      failedPlayerIds
+        .map((id) => players.find((player) => player.id === id)?.name)
+        .filter((name): name is string => Boolean(name)),
+    [failedPlayerIds, players]
+  );
+
+  const loserText = useMemo(() => {
+    if (failedPlayerNames.length === 0) {
+      return 'Keine Fehlschuesse in dieser Runde.';
+    }
+
+    return `Trinken: ${failedPlayerNames.join(', ')}`;
+  }, [failedPlayerNames]);
+
+  const startRound = (starterIndex: number) => {
+    const duration = getRandomTurnDuration();
+
+    setCurrentPlayerIndex(starterIndex);
+    setCurrentCategory(getRandomCategory());
+    setCurrentLetter(getRandomLetter());
+    setTurnDurationSeconds(duration);
+    setTimeLeft(duration);
+    setShotIndex(0);
+    setChambers(Array(CHAMBERS_PER_ROUND).fill(true));
+    setShotOwnerIds(Array(CHAMBERS_PER_ROUND).fill(null));
+    setPhase('playing');
+    setRewardPlayerId(null);
+    setRoundMessage('');
+    setFailedPlayerIds([]);
+    setIsTimerRunning(true);
+    setCurrentMode('game');
+  };
+
+  const resolveShot = (isCorrect: boolean, customMessage?: string) => {
+    if (phase !== 'playing' || !currentPlayer) {
       return;
     }
 
     setIsTimerRunning(false);
-    setRoundExploded(true);
 
-    // Score is updated exactly once when the timer reaches zero, before the next round starts.
-    setPlayers((prev) =>
-      prev.map((player, index) =>
-        index === currentPlayerIndex
-          ? { ...player, penalties: player.penalties + 1 }
-          : player
-      )
+    const nextChambers = chambers.map((value, index) =>
+      index === shotIndex ? isCorrect : value
     );
-  }, [currentPlayerIndex, isTimerRunning, timeLeft]);
+    const nextShotOwners = shotOwnerIds.map((value, index) =>
+      index === shotIndex ? currentPlayer.id : value
+    );
 
-  const currentPlayer = players[currentPlayerIndex];
+    setChambers(nextChambers);
+    setShotOwnerIds(nextShotOwners);
 
-  const leaderText = useMemo(() => {
-    const maxPenalties = Math.max(0, ...players.map((player) => player.penalties));
-
-    if (maxPenalties === 0) {
-      return 'Noch keine Strafpunkte verteilt';
+    if (!isCorrect) {
+      setPengTrigger((prev) => prev + 1);
     }
 
-    const top = players.filter((player) => player.penalties === maxPenalties);
+    setPlayers((prev) =>
+      prev.map((player, index) => {
+        if (index !== currentPlayerIndex) {
+          return player;
+        }
 
-    if (top.length === 1) {
-      return `${top[0].name} verliert aktuell (${maxPenalties} Punkt${maxPenalties > 1 ? 'e' : ''})`;
-    }
+        return {
+          ...player,
+          totalHits: player.totalHits + (isCorrect ? 1 : 0),
+          totalMisses: player.totalMisses + (isCorrect ? 0 : 1),
+        };
+      })
+    );
 
-    return `Gleichstand: ${top.map((player) => player.name).join(', ')} mit ${maxPenalties}`;
-  }, [players]);
+    if (shotIndex === CHAMBERS_PER_ROUND - 1) {
+      const allFull = nextChambers.every(Boolean);
 
-  const moveToNextPlayer = () => {
-    if (players.length === 0) {
+      if (allFull) {
+        setRewardPlayerId(currentPlayer.id);
+        setRoundMessage(`${currentPlayer.name} hat 6/6 getroffen. Volltreffer!`);
+        setPhase('reward');
+        return;
+      }
+
+      const failedIds = Array.from(
+        new Set(
+          nextChambers
+            .map((isFull, index) => (!isFull ? nextShotOwners[index] : null))
+            .filter((id): id is string => Boolean(id))
+        )
+      );
+
+      setFailedPlayerIds(failedIds);
+      setRoundMessage(customMessage ?? 'Mindestens eine Kammer ist leer.');
+      setPhase('result');
       return;
     }
 
-    setCurrentPlayerIndex((prev) => (prev + 1) % players.length);
+    const nextIndex = nextPlayerIndex(currentPlayerIndex, players.length);
+    const nextDuration = getRandomTurnDuration();
+
+    setCurrentPlayerIndex(nextIndex);
+    setShotIndex((prev) => prev + 1);
+    setCurrentLetter(getRandomLetter());
+    setTurnDurationSeconds(nextDuration);
+    setTimeLeft(nextDuration);
+    setIsTimerRunning(true);
   };
 
-  const startRound = () => {
-    setCurrentCategory(buildRoundCategory());
-    setTimeLeft(ROUND_TIME_SECONDS);
-    setRoundExploded(false);
-    setIsTimerRunning(true);
-    setCurrentMode('category-sprint');
+  const markAnswerCorrect = () => resolveShot(true);
+
+  const markAnswerWrong = () => resolveShot(false, 'Falsch: Kammer leer.');
+
+  const assignShotToPlayer = (targetPlayerId: string) => {
+    if (phase !== 'reward' || !rewardPlayerId) {
+      return;
+    }
+
+    const targetName = players.find((player) => player.id === targetPlayerId)?.name;
+
+    setPlayers((prev) =>
+      prev.map((player) =>
+        player.id === rewardPlayerId
+          ? { ...player, drinksGiven: player.drinksGiven + 1 }
+          : player
+      )
+    );
+
+    setRoundMessage(
+      `${rewardPlayer?.name ?? 'Spieler'} verteilt den Shot an ${targetName ?? 'jemanden'}.`
+    );
+    setPhase('result');
   };
 
   const openSetup = () => setCurrentMode('setup');
 
   const backToMenu = () => {
     setIsTimerRunning(false);
-    setRoundExploded(false);
     setCurrentMode('menu');
   };
 
   const startGameFromSetup = () => {
-    if (players.length < MIN_PLAYERS) {
+    if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
+      setSetupMessage(`Es muessen ${MIN_PLAYERS} bis ${MAX_PLAYERS} Spieler teilnehmen.`);
       return;
     }
 
-    setCurrentPlayerIndex(0);
-    startRound();
+    setSetupMessage('');
+    startRound(pickRandomIndex(players.length));
   };
 
   const addPlayer = () => {
@@ -106,12 +232,17 @@ export function useShotclockGame() {
       return;
     }
 
-    // Duplicate names are blocked to keep scoreboard entries unambiguous.
+    if (players.length >= MAX_PLAYERS) {
+      setSetupMessage(`Maximal ${MAX_PLAYERS} Spieler erlaubt.`);
+      return;
+    }
+
     const exists = players.some(
       (player) => player.name.toLowerCase() === trimmed.toLowerCase()
     );
 
     if (exists) {
+      setSetupMessage('Name bereits vorhanden.');
       return;
     }
 
@@ -120,48 +251,82 @@ export function useShotclockGame() {
       {
         id: `${Date.now()}-${trimmed.toLowerCase()}`,
         name: trimmed,
-        penalties: 0,
+        totalHits: 0,
+        totalMisses: 0,
+        drinksGiven: 0,
       },
     ]);
     setNewPlayerName('');
+    setSetupMessage('');
   };
 
   const removePlayer = (id: string) => {
     setPlayers((prev) => prev.filter((player) => player.id !== id));
     setCurrentPlayerIndex(0);
+    setSetupMessage('');
   };
 
-  const playerAnswered = () => {
-    setIsTimerRunning(false);
-    moveToNextPlayer();
-    startRound();
+  const startNextRound = () => {
+    startRound(pickRandomIndex(players.length));
   };
 
-  const continueAfterExplosion = () => {
-    moveToNextPlayer();
-    startRound();
+  const continueAfterRoundResult = () => {
+    if (players.length < MIN_PLAYERS) {
+      setCurrentMode('setup');
+      return;
+    }
+
+    startNextRound();
   };
 
   const resetGame = () => {
-    setPlayers((prev) => prev.map((player) => ({ ...player, penalties: 0 })));
+    setPlayers((prev) =>
+      prev.map((player) => ({
+        ...player,
+        totalHits: 0,
+        totalMisses: 0,
+        drinksGiven: 0,
+      }))
+    );
     setCurrentPlayerIndex(0);
-    setTimeLeft(ROUND_TIME_SECONDS);
-    setRoundExploded(false);
+    const duration = getRandomTurnDuration();
+    setTurnDurationSeconds(duration);
+    setTimeLeft(duration);
+    setShotIndex(0);
+    setChambers(Array(CHAMBERS_PER_ROUND).fill(true));
+    setShotOwnerIds(Array(CHAMBERS_PER_ROUND).fill(null));
+    setPhase('playing');
     setIsTimerRunning(false);
+    setRewardPlayerId(null);
+    setRoundMessage('');
+    setFailedPlayerIds([]);
     setCurrentMode('setup');
   };
 
   return {
     state: {
       currentMode,
+      phase,
       currentCategory,
+      currentLetter,
       timeLeft,
-      roundExploded,
+      turnDurationSeconds,
+      shotIndex,
+      chambers,
       players,
       currentPlayer,
+      currentPlayerIndex,
+      rewardPlayer,
       newPlayerName,
-      leaderText,
-      canStartGame: players.length >= MIN_PLAYERS,
+      setupMessage,
+      roundMessage,
+      failedPlayerNames,
+      loserText,
+      pengTrigger,
+      canStartGame: players.length >= MIN_PLAYERS && players.length <= MAX_PLAYERS,
+      minPlayers: MIN_PLAYERS,
+      maxPlayers: MAX_PLAYERS,
+      chambersPerRound: CHAMBERS_PER_ROUND,
     },
     actions: {
       openSetup,
@@ -170,8 +335,10 @@ export function useShotclockGame() {
       addPlayer,
       removePlayer,
       setNewPlayerName,
-      playerAnswered,
-      continueAfterExplosion,
+      markAnswerCorrect,
+      markAnswerWrong,
+      assignShotToPlayer,
+      continueAfterRoundResult,
       resetGame,
     },
   };
