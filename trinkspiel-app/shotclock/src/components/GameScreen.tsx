@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Text, TouchableOpacity, View } from 'react-native';
 import { Phase, Player } from '../game/types';
+import { useGameSounds } from '../audio/useGameSounds';
 import { styles } from '../styles/appStyles';
 
 type GameScreenProps = {
@@ -63,10 +64,46 @@ export function GameScreen({
   const flashOpacity = useRef(new Animated.Value(0)).current;
   const shakeX = useRef(new Animated.Value(0)).current;
   const pengOpacity = useRef(new Animated.Value(0)).current;
+  const clickStepRef = useRef(0);
+  const clickTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const handledPengTriggerRef = useRef(pengTrigger);
+  const { playClick, playFinalCocking, playPeng } = useGameSounds();
+
+  useEffect(() => {
+    clickStepRef.current = Math.floor(spinAngleValue.current / 60);
+
+    const id = spinAngle.addListener(({ value }) => {
+      const previousStep = clickStepRef.current;
+      const nextStep = Math.floor(value / 60);
+      spinAngleValue.current = value;
+
+      if (nextStep <= previousStep) {
+        return;
+      }
+
+      const crossedSteps = nextStep - previousStep;
+      clickStepRef.current = nextStep;
+
+      for (let i = 0; i < crossedSteps; i += 1) {
+        const timeoutId = setTimeout(() => {
+          playClick();
+        }, i * 32);
+        clickTimeoutsRef.current.push(timeoutId);
+      }
+    });
+
+    return () => {
+      spinAngle.removeListener(id);
+      clickTimeoutsRef.current.forEach(clearTimeout);
+      clickTimeoutsRef.current = [];
+    };
+  }, [spinAngle, playClick]);
 
   useEffect(() => {
     if (phase !== 'playing') {
       spinAngle.stopAnimation();
+      clickTimeoutsRef.current.forEach(clearTimeout);
+      clickTimeoutsRef.current = [];
       return;
     }
 
@@ -91,9 +128,17 @@ export function GameScreen({
   }, [phase, shotIndex, currentPlayerIndex, turnDurationSeconds, spinAngle]);
 
   useEffect(() => {
-    if (pengTrigger <= 0) {
+    if (pengTrigger <= handledPengTriggerRef.current) {
       return;
     }
+
+    handledPengTriggerRef.current = pengTrigger;
+
+    // Final chamber cue right before the gunshot to make the timeout payoff clearer.
+    playFinalCocking();
+    const pengTimeout = setTimeout(() => {
+      playPeng();
+    }, 200);
 
     Animated.parallel([
       Animated.sequence([
@@ -121,7 +166,11 @@ export function GameScreen({
         Animated.timing(pengOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
       ]),
     ]).start();
-  }, [pengTrigger, flashOpacity, shakeX, pengOpacity]);
+
+    return () => {
+      clearTimeout(pengTimeout);
+    };
+  }, [pengTrigger, flashOpacity, shakeX, pengOpacity, playFinalCocking, playPeng]);
 
   const cylinderRotation = spinAngle.interpolate({
     inputRange: [0, 360],
@@ -152,7 +201,7 @@ export function GameScreen({
       </View>
 
       <View style={styles.revolverCard}>
-        <Text style={styles.revolverTitle}>Zylinder (dreht und wird langsamer)</Text>
+        <Text style={styles.revolverTitle}>Revolver (dreht und wird langsamer)</Text>
         <View style={styles.revolverBody}>
           <View style={[styles.chamberCircleBase, { left: circleLeft, top: circleTop }]} />
 
@@ -227,8 +276,10 @@ export function GameScreen({
 
       {phase === 'reward' && (
         <View style={styles.rewardCard}>
-          <Text style={styles.rewardTitle}>Volltreffer! {rewardPlayerName} hat 6/6 getroffen.</Text>
-          <Text style={styles.rewardText}>Wen willst du zum Shot bestimmen?</Text>
+          <Text style={styles.rewardTitle}>
+            Stark! {rewardPlayerName} hat alle eigenen Patronen gehalten.
+          </Text>
+          <Text style={styles.rewardText}>Wen willst du fuer einen Schluck auswaehlen?</Text>
           {players
             .filter((player) => player.name !== rewardPlayerName)
             .map((player) => (
